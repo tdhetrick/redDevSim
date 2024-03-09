@@ -10,10 +10,11 @@ import requests
 url = 'http://127.0.0.1:5000/devdata'
 
 threads = []
-num_devices = 500
+num_devices = 4000
 
 class DeviceSimulatorModified:
-    def __init__(self, seed, interval=10):
+    def __init__(self, seed, interval=5):
+        self.start_interval = interval
         self.random = random.Random(seed)
         self.interval = interval
         # Modifying frequency and amplitude based on the seed
@@ -22,6 +23,10 @@ class DeviceSimulatorModified:
         self.time = 0  # Time variable to simulate continuous time passage
 
     def generate_data(self):
+
+        # add a little uncertainty to device response
+        wait_time = random.randint(1, 5)
+        time.sleep(wait_time)
         
         sine_value = self.amplitude * math.sin(self.frequency * self.time)
 
@@ -62,14 +67,21 @@ class DeviceSimulatorModified:
             try:
                 response = requests.post(url, json=data, timeout=5)  # Make sure 'url' is defined
                 #response.raise_for_status()  # This will raise an HTTPError if the response was an unsuccessful status code
+                if response.elapsed.total_seconds() > 1:
+                    self.interval = self.interval * 2
+                    print(f"Response time {response.elapsed.total_seconds()} interval now {self.interval }")
             except requests.exceptions.HTTPError as e:
                 print(f"HTTP error occurred: {e}")
                 # Handle HTTP-specific errors or log them
             except requests.exceptions.ConnectionError as e:
                 print(f"Error connecting: {e}")
+                self.interval = self.interval * 2
+                print(f"INTERVAL CHANGE to {self.interval}")
                 # Handle connection errors
             except requests.exceptions.Timeout as e:
                 print(f"Timeout error: {e}")
+                self.interval = self.interval * 2
+                print(f"INTERVAL CHANGE to {self.interval}")
                 # Handle requests timeout
             except requests.exceptions.RequestException as e:
                 print(f"Error making the request: {e}")
@@ -78,10 +90,8 @@ class DeviceSimulatorModified:
                 print(f"An unexpected error occurred: {e}")
                 # Handle any other unexpected errors
 
-            # Uncomment and handle Redis operations if needed
-            # for key, value in data.items():
-            #     redis_key = f"{device_name}:{key}"
-            #     redis_client.set(redis_key, value)
+            if self.interval > self.start_interval:
+                self.interval = self.interval - 1
 
             time.sleep(self.interval)  # Make sure 'self.interval' is defined
 # Restarting the threads with the modified simulator
